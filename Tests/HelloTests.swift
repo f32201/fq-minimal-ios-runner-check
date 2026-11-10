@@ -1,0 +1,5 @@
+import XCTest
+@testable import HelloFangQiao
+final class HelloTests: XCTestCase {
+    func testSanity() { XCTAssertEqual(1 + 1, 2) }
+}
