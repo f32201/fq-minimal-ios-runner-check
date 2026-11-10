@@ -1,0 +1,53 @@
+name: hello-ios
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show runner and Xcode
+        run: |
+          echo "runner.os=$RUNNER_OS"
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list devices available
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: |
+          xcodegen generate --spec project.yml
+          xcodebuild -list -project HelloFangQiao.xcodeproj
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          DEVICE=$(xcrun simctl list devices available | grep -oE 'iPhone [^(]+' | head -1 | sed 's/[[:space:]]*$//')
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          test -n "$DEVICE"
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild -project HelloFangQiao.xcodeproj -scheme HelloFangQiao \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log
+      - name: XCTest
+        run: |
+          set -o pipefail
+          xcodebuild -project HelloFangQiao.xcodeproj -scheme HelloFangQiao \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO test 2>&1 | tee test.log
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-ios-logs
+          path: |
+            build.log
+            test.log
+            project.yml
